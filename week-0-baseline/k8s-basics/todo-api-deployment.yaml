@@ -49,7 +49,7 @@ kind: Service
 metadata:
   name: todo-api
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: todo-api
   ports:
