@@ -30,6 +30,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: lint  # What job must complete first?
+    defaults:
+      run:
+        working-directory: week-0-baseline/todo-api
     
     steps:
       - name: Checkout code
