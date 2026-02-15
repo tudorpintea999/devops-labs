@@ -20,11 +20,11 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Task not found' });
     }
-    
+
     res.json({ task: result.rows[0] });
   } catch (error) {
     console.error('Error fetching task:', error);
@@ -36,16 +36,16 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { title } = req.body;
-    
+
     if (!title || title.trim() === '') {
       return res.status(400).json({ error: 'Title is required' });
     }
-    
+
     const result = await db.query(
       'INSERT INTO tasks (title) VALUES ($1) RETURNING *',
       [title.trim()]
     );
-    
+
     res.status(201).json({ task: result.rows[0] });
   } catch (error) {
     console.error('Error creating task:', error);
@@ -58,40 +58,40 @@ router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { title, completed } = req.body;
-    
+
     // Build dynamic update query
     const updates = [];
     const values = [];
     let paramCount = 1;
-    
+
     if (title !== undefined) {
       updates.push(`title = $${paramCount}`);
       values.push(title.trim());
       paramCount++;
     }
-    
+
     if (completed !== undefined) {
       updates.push(`completed = $${paramCount}`);
       values.push(completed);
       paramCount++;
     }
-    
+
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
-    
+
     updates.push(`updated_at = CURRENT_TIMESTAMP`);
     values.push(id);
-    
+
     const result = await db.query(
       `UPDATE tasks SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
       values
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Task not found' });
     }
-    
+
     res.json({ task: result.rows[0] });
   } catch (error) {
     console.error('Error updating task:', error);
@@ -107,15 +107,45 @@ router.delete('/:id', async (req, res) => {
       'DELETE FROM tasks WHERE id = $1 RETURNING *',
       [id]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Task not found' });
     }
-    
+
     res.json({ message: 'Task deleted successfully', task: result.rows[0] });
   } catch (error) {
     console.error('Error deleting task:', error);
     res.status(500).json({ error: 'Failed to delete task' });
+  }
+});
+
+// POST /tasks - Create new task
+router.post('/', async (req, res) => {
+  try {
+    const { title } = req.body;
+
+    // Enhanced validation
+    if (!title || title.trim() === '') {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    if (title.length > 255) {
+      return res.status(400).json({ error: 'Title must be under 255 characters' });
+    }
+
+    if (typeof title !== 'string') {
+      return res.status(400).json({ error: 'Title must be a string' });
+    }
+
+    const result = await db.query(
+      'INSERT INTO tasks (title) VALUES ($1) RETURNING *',
+      [title.trim()]
+    );
+
+    res.status(201).json({ task: result.rows[0] });
+  } catch (error) {
+    console.error('Error creating task:', error);
+    res.status(500).json({ error: 'Failed to create task' });
   }
 });
 
