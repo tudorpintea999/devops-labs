@@ -1,0 +1,12 @@
+# Global owner - reviews everything
+*                                   @tudorpintea999
+
+# CI/CD pipeline changes need extra scrutiny
+.github/workflows/                  @tudorpintea999
+
+# Kubernetes manifests
+week-0-baseline/todo-api/k8s/       @tudorpintea999
+week-1-ci-cd/todo-api/k8s/         @tudorpintea999
+
+# Week 1 specific
+week-1-ci-cd/                       @tudorpintea999
