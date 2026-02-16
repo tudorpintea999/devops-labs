@@ -2,18 +2,16 @@ name: CI Pipeline
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: week-0-baseline/todo-api
+        working-directory: week-1-ci-cd/todo-api
 
     steps:
       - name: Checkout code
@@ -23,35 +21,78 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'                    # ← Built-in npm caching!
+          cache-dependency-path: week-1-ci-cd/todo-api/package-lock.json      # ← Which file to hash?
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci                    # ← Why ci instead of install?
 
       - name: Run linter
         run: npm run lint
 
-  build:
+  test:
     runs-on: ubuntu-latest
     needs: lint
     defaults:
       run:
-        working-directory: week-0-baseline/todo-api
+        working-directory: week-1-ci-cd/todo-api
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: package.json      # ← Same as above
+
+      - name: Install dependencies
+        run: npm ci 
+
+      - name: Run tests
+        run: npm test
+
+      - name: Upload coverage report    # ← Artifact!
+        uses: actions/upload-artifact@v4
+        if: always()                         # ← Always upload? Even on failure?
+        with:
+          name: coverage-report-${{ github.sha }}   # ← Artifact naming with SHA!
+          path: coverage                     # ← Where does Jest save coverage?
+          retention-days: 30           # ← How many days to keep it?
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test                          # ← What must pass before build?
+    defaults:
+      run:
+        working-directory: week-1-ci-cd/todo-api
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx      # ← Enables Docker layer caching!
+        uses: docker/setup-buildx-action@v3
+
       - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/todo-api:main-${{ github.sha }} .
-  
+        uses: docker/build-push-action@v5
+        with:
+          context: week-1-ci-cd/todo-api
+          push: false
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/todo-api:main-${{ github.sha }}
+          cache-from: type=gha          # ← Use GitHub Actions cache!
+          cache-to: type=gha,mode=max   # ← Save to GitHub Actions cache!
+
   push:
     runs-on: ubuntu-latest
     needs: build
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     defaults:
       run:
-        working-directory: week-0-baseline/todo-api
-    
+        working-directory: week-1-ci-cd/todo-api
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -62,7 +103,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push Docker image
-        run: |
-             docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/todo-api:main-${{ github.sha }} .
-             docker push ${{ secrets.DOCKERHUB_USERNAME }}/todo-api:main-${{ github.sha }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: week-1-ci-cd/todo-api
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/todo-api:main-${{ github.sha }}
+          cache-from: type=gha          # ← Reuse cache from build job!
+          cache-to: type=gha,mode=max
